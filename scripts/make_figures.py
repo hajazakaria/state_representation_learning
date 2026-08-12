@@ -22,7 +22,6 @@ and the per-seed SAC_* folders are picked up automatically:
         donkey-minimonaco-track-v0/SAC_3/events.out.tfevents.*
     car_srl_ae_32_with_speed_minimonacoTrack/            ... same layout
     car_srl_ae_64_with_speed_minimonacoTrack/            ... same layout
-    car_srl_ae_64_400_epochs_with_speed_minimonacoTrack/ ... same layout
 
 One run = one SAC_* directory. If such a directory holds several event files
 (e.g. a resumed run), they are concatenated into a single run.

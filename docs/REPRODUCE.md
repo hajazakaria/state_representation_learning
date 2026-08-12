@@ -30,9 +30,9 @@ first `env.step()`.
 
 ## 1. CAE pre-training → Figures 6 and 7, and the SSIM values in Section 6.1
 
-Both encoders in `models/` were produced this way. Re-running is only necessary
-if you want to verify training; to reproduce the RL results, use the shipped
-weights.
+Both encoders in `models/` were produced this way -- `ae-32_minimonaco_600_epochs_best.pkl`
+and its 64-dim counterpart. Re-running is only necessary if you want to verify
+training; to reproduce the RL results, use the shipped weights.
 
 | Setting | Value |
 |---|---|
@@ -53,22 +53,26 @@ that this does not carry over to control performance.
 
 ## 2. SAC training → Figure 8 and Table 3
 
-Four configurations × 5 independent runs × 1,000,000 environment steps.
+Four configurations, multiple independent runs each, 1,000,000 environment steps
+per run. (The run count in `logs/` must match the figure stated in Section 5.2 of
+the paper -- see the note in the top-level README.)
 
 | Config | Policy | Observation fed to the policy |
 |---|---|---|
 | 1 | `CnnPolicy` (NatureCNN, trained from scratch online) | raw 120×160×3 frame |
-| 2 | `MlpPolicy` | `z_t` from `cae_32.pkl` |
-| 3 | `MlpPolicy` | `[z_t, v_t]` from `cae_32.pkl` |
-| 4 | `MlpPolicy` | `[z_t, v_t]` from `cae_64.pkl` |
+| 2 | `MlpPolicy` | `z_t` from `ae-32_minimonaco_600_epochs_best.pkl` |
+| 3 | `MlpPolicy` | `[z_t, v_t]` from `ae-32_minimonaco_600_epochs_best.pkl` |
+| 4 | `MlpPolicy` | `[z_t, v_t]` from `ae-64_minimonaco_600_epochs_best.pkl` |
 
 Hyperparameters are the RL Zoo SAC defaults, unchanged across all four — see the
 table in the top-level README. The encoder is frozen for Configs 2–4; only the
 actor, critics and entropy temperature are updated.
 
 Wrap the environment so that each `step` returns the state vector rather than
-the frame: encode the frame with `src/autoencoder/load_encoder.py`, and for
-Configs 3 and 4 append the simulator speed scaled by `V_MAX = 10.0`. Apply the
+the frame: encode the frame with `load_ae(...).encode_from_raw_image(frame)`
+from `src/autoencoder/autoencoder_32.py` (or `autoencoder_64.py`), and for
+Configs 3 and 4 append the simulator speed divided by `v_max = 10.0` and clipped
+to `[0, 1]`. Apply the
 reward from Equation 5, and terminate on collision or `|CTE| > max_cte = 8.0`.
 Steering is `[-1, 1]`; throttle is rescaled to `[0, 1]` before it reaches the
 simulator.
@@ -77,8 +81,8 @@ Evaluation: every 10,000 steps, 5 deterministic episodes from the same fixed
 start pose. Evaluation transitions must not enter the replay buffer.
 
 Cost ≈ 180 s per 10k steps for Configs 2–4, ≈ 430 s for Config 1 — so a single
-Config 1 run is roughly 12 hours and a full sweep of 20 runs is on the order of
-a week of CPU time. **This excludes the ≈ 38 hours of CAE pre-training that
+Config 1 run is roughly 12 hours and a full sweep across all four
+configurations and every run is on the order of a week of CPU time. **This excludes the ≈ 38 hours of CAE pre-training that
 Configs 2–4 additionally require and Config 1 does not.** The paper reports both
 figures rather than the RL time alone.
 
@@ -89,9 +93,14 @@ figures rather than the RL time alone.
 Regenerate the curves from the shipped logs, with no retraining:
 
 ```bash
-python scripts/export_tensorboard.py --logdir logs --out logs/eval_curves.csv
-python scripts/make_figures.py
+python scripts/make_figures.py --root logs --out ./figures
 ```
+
+`make_figures.py` parses the event files directly, so no TensorFlow is needed.
+Curves are exponentially smoothed with `SMOOTH_ALPHA = 0.20` -- the value quoted
+in the Figure 8 caption -- and resampled onto a common step grid before
+aggregation. `scripts/export_tensorboard.py` will additionally emit a tidy
+`config, run, step, metric, value` CSV if you want the curves as plain text.
 
 Figure 8 shows, per configuration: the **interquartile mean** across the five
 runs as a solid curve, the **min–max envelope** of the individual runs as a
@@ -119,8 +128,8 @@ and a 28.5 s median, reaching 50%-of-peak at ≈ 136k steps. Config 4 peaks at
 ## 4. What cannot be reproduced from this repository
 
 - **Cross-track results.** There are none. Everything is MiniMonaco.
-- **Statistical tests.** None were run; five runs per configuration are reported
-  descriptively. The per-run logs are provided so anyone can compute their own.
+- **Statistical tests.** None were run; per-run results are reported
+  descriptively. The logs are provided so anyone can compute their own.
 - **A competitive end-to-end baseline.** Config 1 is SB3 defaults with no image
   augmentation. It is a reference point, not a tuned pixel-based agent.
 

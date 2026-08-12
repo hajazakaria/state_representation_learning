@@ -36,13 +36,14 @@ $z_t$ is the latent code of the current frame; $v_t$ is the scalar forward speed
 ## Repository layout
 
 ```
-├── src/autoencoder/       CAE architecture definitions (32-dim and 64-dim)
-├── models/                Trained encoder weights (.pkl)
-├── data/                  The 5,000-frame CAE training corpus
+├── src/autoencoder/       CAE definitions: autoencoder_32.py, autoencoder_64.py
+├── models/                Trained encoder checkpoints (.pkl)
+├── data/                  The CAE training corpus
 ├── logs/                  Per-run TensorBoard logs behind Figures 8 and 9
-├── scripts/               Checkpoint inspection, log export, figure generation
+├── scripts/               Figure generation, checkpoint inspection, log export
 ├── docs/REPRODUCE.md      Step-by-step reproduction
 ├── environment.yml        Exact Conda environment used for every result
+├── THIRD_PARTY_NOTICES.md Upstream projects this work builds on
 └── CITATION.cff
 ```
 
@@ -69,7 +70,7 @@ The fork reports package version 21.02.20, inherited from the upstream release i
 
 ## Pre-trained encoders
 
-`models/cae_32.pkl` and `models/cae_64.pkl` are the frozen encoders used for Configs 2–4. They were selected by early stopping on validation MSE (patience 30 epochs, weights restored from the best epoch) after up to 600 epochs of training.
+`models/ae-32_minimonaco_600_epochs_best.pkl` and `models/ae-64_minimonaco_600_epochs_best.pkl` are the frozen encoders used for Configs 2–4. They were selected by early stopping on validation MSE (patience 30 epochs, weights restored from the best epoch) after up to 600 epochs of training.
 
 | | Latent dim | Encoder conv layers | Final val. SSIM | Training wall-clock |
 |---|---|---|---|---|
@@ -82,25 +83,35 @@ Both were trained **on CPU only** (Intel Core i5-12500, no discrete GPU), which 
 
 Despite the extension, each file is a serialised checkpoint dictionary rather than a pickled model object:
 
-```python
+```
 {"state_dict": OrderedDict(...), "data": {"z_size": 32, ...}}
 ```
 
-So loading is three steps — read the checkpoint, instantiate the architecture indicated by the metadata, load the tensors — which `src/autoencoder/load_encoder.py` does for you:
+`src/autoencoder/autoencoder_32.py` and `autoencoder_64.py` both provide a `load_ae` helper that reads the checkpoint, recovers the latent width from the metadata, and returns a ready `Autoencoder`:
 
 ```python
-from src.autoencoder.load_encoder import load_encoder, encode, build_state
-encoder = load_encoder("models/cae_32.pkl")     # latent width read from metadata
-state   = build_state(encode(encoder, frame), speed=v_t)
+from autoencoder_32 import load_ae
+
+ae = load_ae("models/ae-32_minimonaco_600_epochs_best.pkl")   # z_size recovered from the checkpoint
+z  = ae.encode_from_raw_image(frame)      # frame: uint8 HxWx3, RGB
 ```
+
+For Configs 3 and 4 the agent's state is the latent code with the scalar speed appended, scaled by `v_max = 10`:
+
+```python
+import numpy as np
+state = np.concatenate([z.flatten(), [min(speed / 10.0, 1.0)]])
+```
+
+Input frames are divided by 255 into `[0, 1]` (`preprocess_input(..., mode="rl")`). This must match at inference time, or the latents fall out of distribution and the policy misbehaves for reasons that are hard to trace.
 
 To see what a checkpoint holds before writing code against it:
 
 ```bash
-python scripts/inspect_checkpoint.py models/cae_32.pkl
+python scripts/inspect_checkpoint.py models/ae-32_minimonaco_600_epochs_best.pkl
 ```
 
-This layout is inherited from araffin/aae-train-donkeycar. Note that `torch.load` on PyTorch 2.6 or newer defaults to `weights_only=True` and will reject the non-tensor metadata dictionary; the loader retries with `weights_only=False` automatically.
+This checkpoint layout is inherited from araffin/aae-train-donkeycar. Note that `torch.load` on PyTorch 2.6 or newer defaults to `weights_only=True` and will reject the non-tensor metadata dictionary.
 
 ---
 
@@ -149,11 +160,31 @@ CTE is the signed lateral distance between the car's centre and the track centre
 
 ## Learning curves and logs
 
-`logs/` holds the TensorBoard event files for all 20 runs — 5 per configuration —
-together with `logs/eval_curves.csv`, a tidy `config, run, step, metric, value`
-export produced by `scripts/export_tensorboard.py`. The CSV is enough to redraw
-Figure 8, recompute every entry of Table 3, and run statistical tests across the
-five runs of a configuration without retraining anything.
+<!-- TODO: this states THREE runs per configuration, which is what logs.zip
+     actually contains. The paper states five. If five runs were performed,
+     upload the remaining event files and change this number back. If only three
+     were performed, correct Section 5.2, Table 3 and the Figure 8 caption in the
+     paper to match. These two numbers must agree. -->
+
+`logs/logs.zip` holds the raw TensorBoard event files, three runs per
+configuration, laid out as
+`<condition>/donkey-minimonaco-track-v0/SAC_<n>/events.out.tfevents.*`. One
+`SAC_*` directory is one run.
+
+`scripts/make_figures.py` reads these directly -- no TensorFlow or tbparse
+required -- and regenerates every figure in the paper plus a CSV of per-run
+aggregate metrics:
+
+```bash
+python scripts/make_figures.py --root logs --out ./figures
+```
+
+Aggregation follows Agarwal et al. (2021): the interquartile mean across runs,
+a min-max envelope as a shaded band, and individual runs drawn faintly behind.
+Curves are exponentially smoothed with `SMOOTH_ALPHA = 0.20` and resampled onto
+a common step grid before aggregation. `scripts/export_tensorboard.py` will
+additionally write a tidy `config, run, step, metric, value` CSV if you want the
+curves in plain text.
 
 ## Reproducing the paper
 
