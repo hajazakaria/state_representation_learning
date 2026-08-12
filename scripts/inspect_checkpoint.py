@@ -6,7 +6,7 @@ before writing code against it -- particularly the recorded latent width and the
 layer names, which tell you whether the file stores the encoder alone or the
 full autoencoder.
 
-    python scripts/inspect_checkpoint.py models/cae_32.pkl
+    python scripts/inspect_checkpoint.py models/ae-32_minimonaco_600_epochs_best.pkl
 """
 
 import argparse
@@ -80,8 +80,8 @@ def main():
     )
     if has_decoder:
         print(
-            "note        : instantiate the full model, or call load_encoder(..., "
-            "strict=False)\n              and check the reported unmatched keys."
+            "note        : use load_ae() from src/autoencoder/autoencoder_32.py,"
+            "\n              which instantiates the full model and restores every key."
         )
     return 0
 

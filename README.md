@@ -160,14 +160,8 @@ CTE is the signed lateral distance between the car's centre and the track centre
 
 ## Learning curves and logs
 
-<!-- TODO: this states THREE runs per configuration, which is what logs.zip
-     actually contains. The paper states five. If five runs were performed,
-     upload the remaining event files and change this number back. If only three
-     were performed, correct Section 5.2, Table 3 and the Figure 8 caption in the
-     paper to match. These two numbers must agree. -->
-
-`logs/logs.zip` holds the raw TensorBoard event files, three runs per
-configuration, laid out as
+`logs/logs.zip` holds the raw TensorBoard event files for all 20 runs -- five
+per configuration -- laid out as
 `<condition>/donkey-minimonaco-track-v0/SAC_<n>/events.out.tfevents.*`. One
 `SAC_*` directory is one run.
 
@@ -185,6 +179,17 @@ Curves are exponentially smoothed with `SMOOTH_ALPHA = 0.20` and resampled onto
 a common step grid before aggregation. `scripts/export_tensorboard.py` will
 additionally write a tidy `config, run, step, metric, value` CSV if you want the
 curves in plain text.
+
+`scripts/run_statistics.py` computes the run-level metrics and the between-run
+tests reported in the paper, writing `per_run_metrics.csv` and
+`pairwise_tests.csv`:
+
+```bash
+python scripts/run_statistics.py --root logs --out stats
+```
+
+It reuses the event parser inside `make_figures.py`, so the statistics and the
+figures are computed from exactly the same source and cannot drift apart.
 
 ## Reproducing the paper
 
