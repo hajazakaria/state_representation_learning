@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: >-
+  State Representation Learning for Autonomous Racing with Soft Actor-Critic
+message: >-
+  If you use this repository, please cite the associated paper.
+type: software
+authors:
+  - family-names: Haja
+    given-names: Zakaria
+  - family-names: Haja
+    given-names: Fatima-Zahra
+  - family-names: Kelmoua
+    given-names: Leila
+  - family-names: Bouchentouf
+    given-names: Toumi
+  - family-names: Berrich
+    given-names: Jamal
+license: MIT
+repository-code: >-
+  https://github.com/hajazakaria/state_representation_learning
+keywords:
+  - reinforcement learning
+  - soft actor-critic
+  - state representation learning
+  - convolutional autoencoder
+  - autonomous racing
+  - donkeycar
+preferred-citation:
+  type: article
+  title: >-
+    The Impact of State Representation on Entropic Control for Autonomous Racing
+  authors:
+    - family-names: Haja
+      given-names: Zakaria
+    - family-names: Haja
+      given-names: Fatima-Zahra
+    - family-names: Kelmoua
+      given-names: Leila
+    - family-names: Bouchentouf
+      given-names: Toumi
+    - family-names: Berrich
+      given-names: Jamal
+  journal: Array
+  year: 2026
+  notes: Under review. Manuscript ARRAY-D-26-02717.

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Simulator binaries — too large for git, download from the gym-donkeycar releases page
+DonkeySim*/
+*.exe
+*.x86_64
+*.app/
+
+# Local scratch
+scratch/
+tmp/
+*.log.local
+
+# Keep the tracked artefacts below even though the patterns above are broad
+!models/*.pkl
+!logs/**/*.csv
+!logs/**/*.json
