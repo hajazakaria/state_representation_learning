@@ -13,12 +13,22 @@ Outputs
     per_run_metrics.csv   one row per run: asymptotic return, peak, last step
     pairwise_tests.csv    Welch t, Mann-Whitney U, Cliff's delta per comparison
 
-Definition of asymptotic return: the mean of rollout/ep_rew_mean over the final
-ASYM_WINDOW steps of a run. This is a run-level summary, so each configuration
+Definition of asymptotic return: the mean of rollout/ep_rew_mean over the
+absolute step range [BUDGET - ASYM_WINDOW, BUDGET), identical for every run and
+every configuration. This is a run-level summary, so each configuration
 contributes exactly five numbers to every test -- which is what makes a
 between-run test legitimate. Averaging within a run first is essential: treating
 individual episodes as samples would inflate n by pooling correlated data from
 the same policy.
+
+CAVEAT. The tests below assume the five runs of a configuration are independent
+replicates. The released event files show that three of the five runs in each
+configuration share an identical episode-boundary structure, and coincide
+exactly on all metrics over part of the final phase of training (Section 7.3 of
+the paper). That assumption therefore does not hold, which is why the paper
+reports run-to-run spread descriptively and does not report these tests. This
+script is retained so the per-run metrics can be recomputed, not to support an
+inferential claim.
 
 With n = 5 per group the smallest attainable two-sided Mann-Whitney p is 0.0079,
 so that value indicates complete separation rather than a marginal result. Read
@@ -39,6 +49,14 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+# One window definition, shared with make_figures.py: an ABSOLUTE step range,
+# not each run's own final steps. Using each run's own tail put the window at
+# different absolute ranges across configurations (roughly 1.00-1.10e6 for
+# Config 3 against 0.82-0.92e6 for Config 1), which made the configurations
+# non-comparable. Runs that never reach BUDGET - ASYM_WINDOW contribute no
+# value and are reported as NaN rather than silently summarised over a
+# different part of training.
+BUDGET      = 900_000
 ASYM_WINDOW = 100_000
 TAG = "rollout/ep_rew_mean"
 
@@ -96,7 +114,8 @@ def main():
             last = int(s.step.max())
             rows.append(dict(
                 config=cond, run=os.path.basename(run), last_step=last,
-                asymptotic_return=float(s[s.step >= last - ASYM_WINDOW].value.mean()),
+                asymptotic_return=float(
+                    s[(s.step >= BUDGET - ASYM_WINDOW) & (s.step < BUDGET)].value.mean()),
                 peak_return=float(s.value.max())))
 
     per_run = pd.DataFrame(rows).sort_values(["config", "run"])

@@ -319,11 +319,17 @@ def aggregate(runs, tag, grid, smooth=True):
             va = ema(va)
         mat.append(resample(st, va, grid))
     mat = np.vstack(mat)
+    # Curves run the full length of the longest run of a condition, but the
+    # number of runs supporting each point is returned alongside so it can be
+    # drawn. Runs end at different steps (Section 5.2 of the paper), so without
+    # this the tail of a curve summarises fewer and fewer runs without saying
+    # so. n_runs is what fig_overview plots in its lower strip.
+    n_runs = np.sum(~np.isnan(mat), axis=0)
     iqm = np.array([
         trim_mean(col[~np.isnan(col)], 0.25) if np.sum(~np.isnan(col)) >= 2 else np.nan
         for col in mat.T
     ])
-    return iqm, np.nanmin(mat, axis=0), np.nanmax(mat, axis=0), mat
+    return iqm, np.nanmin(mat, axis=0), np.nanmax(mat, axis=0), mat, n_runs
 
 
 def return_scale(data):
@@ -349,10 +355,28 @@ def return_scale(data):
 # Shared plotting helper
 # --------------------------------------------------------------------------
 
+def count_strip(ax, data, tag, conds, grid, xmax=None):
+    """Draw how many runs support each point of the curves above.
+
+    Runs of a condition end at different steps, so the right-hand part of a
+    curve can rest on fewer runs than the left. Plotting the count states that
+    explicitly instead of leaving it to the caption.
+    """
+    for cond in conds:
+        _, _, _, _, n_runs = aggregate(data[cond], tag, grid)
+        n = np.where(n_runs > 0, n_runs, np.nan)
+        ax.step(grid, n, color=COLORS[cond], ls=STYLES[cond], lw=1.3, where="post")
+    ax.set_ylabel("runs")
+    ax.set_ylim(0, 5.6)
+    ax.set_yticks([0, 5])
+    ax.set_xlim(0, BUDGET if xmax is None else xmax)
+    millions_axis(ax)
+
+
 def curve_panel(ax, data, tag, conds, grid, ylabel, band=True, faint=True,
                 xmax=None):
     for cond in conds:
-        iqm, lo, hi, mat = aggregate(data[cond], tag, grid)
+        iqm, lo, hi, mat, _ = aggregate(data[cond], tag, grid)
         c, ls = COLORS[cond], STYLES[cond]
         if faint:
             for row in mat:
@@ -396,7 +420,11 @@ def fig_overview(data, grid, out):
         # Extend the resampling grid to match a wider axis, otherwise the
         # curves would stop at BUDGET and leave the panel blank on the right.
         g = grid if xmax is None else np.linspace(0, xmax, int(450 * xmax / BUDGET))
-        fig, ax = plt.subplots(figsize=(5.4, 3.6))
+        # A short strip under each panel reports how many runs support each
+        # point, since runs of a condition end at different steps.
+        fig, (ax, axn) = plt.subplots(
+            2, 1, figsize=(5.4, 4.1), sharex=True,
+            gridspec_kw={"height_ratios": [4.6, 1.0], "hspace": 0.08})
         curve_panel(ax, data, tag, conds, g, ylabel, xmax=xmax)
         ax.set_title(title)
         # A single narrow panel leaves less room than the old two-panel layout,
@@ -404,6 +432,9 @@ def fig_overview(data, grid, out):
         lo, hi = ax.get_ylim()
         ax.set_ylim(lo, lo + (hi - lo) * 1.32)
         ax.legend(loc=legend_loc, frameon=False, fontsize=7)
+        ax.tick_params(labelbottom=False)
+        ax.set_xlabel("")
+        count_strip(axn, data, tag, conds, g, xmax=xmax)
         save(fig, out, name)
 
 
@@ -423,7 +454,7 @@ def fig_pair(data, grid, out, pair):
     ins = axes[1].inset_axes([0.46, 0.14, 0.50, 0.44])
     gsub = np.linspace(0, 50_000, 260)
     for cond in conds:
-        iqm, lo, hi, _ = aggregate(data[cond], "rollout/ep_len_mean", gsub)
+        iqm, lo, hi, _, _ = aggregate(data[cond], "rollout/ep_len_mean", gsub)
         ins.fill_between(gsub, lo, hi, color=COLORS[cond], alpha=0.15, lw=0)
         ins.plot(gsub, iqm, color=COLORS[cond], ls=STYLES[cond], lw=1.5)
     ins.set_title("first 50k steps", fontsize=7, pad=2)
@@ -484,7 +515,7 @@ def fig_critic(data, scale, out):
     fig, ax = plt.subplots(figsize=(5.4, 3.4))
     peaks = []
     for cond in CONDITIONS:
-        iqm, lo, hi, _ = aggregate(data[cond], "train/critic_loss", grid)
+        iqm, lo, hi, _, _ = aggregate(data[cond], "train/critic_loss", grid)
         s = scale[cond]
         ax.fill_between(grid, lo / s, hi / s, color=COLORS[cond], alpha=0.12, lw=0)
         ax.plot(grid, iqm / s, color=COLORS[cond], ls=STYLES[cond], lw=1.9,
