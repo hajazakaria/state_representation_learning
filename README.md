@@ -154,7 +154,7 @@ r_t = -15 - 2·(v_t / v_max)              if the episode terminates (collision o
 
 CTE is the signed lateral distance between the car's centre and the track centreline, in simulator distance units. The threshold 1.5 is the edge of the *rewarded corridor*, not the off-track boundary: episodes terminate on collision or when `|CTE| > max_cte = 8.0`. No maximum episode length is imposed. The reward is deliberately discontinuous at `|CTE| = 1.5`.
 
-**Evaluation.** Every 10,000 steps, 5 deterministic episodes from the same fixed start pose on the start/finish line. Evaluation transitions never enter the replay buffer. Five independent runs per configuration.
+**Evaluation.** During training the policy was also evaluated every 10,000 steps over 5 deterministic episodes from a fixed start pose. Those evaluation outputs were not retained, and no result in the paper depends on them. Five training runs per configuration; three of the five in each configuration share a logging structure, described in `logs/README.md`.
 
 ---
 
@@ -165,9 +165,22 @@ per configuration -- laid out as
 `<condition>/donkey-minimonaco-track-v0/SAC_<n>/events.out.tfevents.*`. One
 `SAC_*` directory is one run.
 
-`scripts/make_figures.py` reads these directly -- no TensorFlow or tbparse
-required -- and regenerates every figure in the paper plus a CSV of per-run
-aggregate metrics:
+**Every reinforcement learning result in the paper is computed from these logs.**
+`scripts/traceable_metrics.py` produces every entry of Tables 4 and 5, and
+`scripts/make_figure9.py` regenerates Figure 9:
+
+```bash
+unzip logs/logs.zip -d logs/
+python scripts/traceable_metrics.py --root logs/logs --out stats
+python scripts/make_figure9.py --laps stats/laps_traceable.csv
+```
+
+The aggregation, the step windows and the metric definitions are documented in
+`logs/README.md`, and the CSVs committed there are exactly what the script writes.
+
+`scripts/make_figures.py` reads the event files directly -- no TensorFlow or
+tbparse required -- and regenerates the learning curves of Figure 8 plus a set of
+supplementary diagnostic plots:
 
 ```bash
 python scripts/make_figures.py --root logs --out ./figures
@@ -180,16 +193,12 @@ a common step grid before aggregation. `scripts/export_tensorboard.py` will
 additionally write a tidy `config, run, step, metric, value` CSV if you want the
 curves in plain text.
 
-`scripts/run_statistics.py` computes the run-level metrics and the between-run
-tests reported in the paper, writing `per_run_metrics.csv` and
-`pairwise_tests.csv`:
-
-```bash
-python scripts/run_statistics.py --root logs --out stats
-```
-
-It reuses the event parser inside `make_figures.py`, so the statistics and the
-figures are computed from exactly the same source and cannot drift apart.
+`scripts/run_statistics.py` computes per-run asymptotic returns over the same
+absolute window, [800,000, 900,000), and also writes pairwise tests to
+`pairwise_tests.csv`. Those tests assume independent runs, which these runs are
+not, so **the paper does not report them**; the script is kept so the per-run
+values can be recomputed. All three scripts share the event parser in
+`make_figures.py`.
 
 ## Reproducing the paper
 

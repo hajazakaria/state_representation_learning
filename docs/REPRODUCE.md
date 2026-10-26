@@ -51,11 +51,11 @@ that this does not carry over to control performance.
 
 ---
 
-## 2. SAC training → Figure 8 and Table 3
+## 2. SAC training (how the released runs were produced)
 
-Four configurations, multiple independent runs each, 1,000,000 environment steps
-per run. (The run count in `logs/` must match the figure stated in Section 5.2 of
-the paper -- see the note in the top-level README.)
+Four configurations, five runs each, configured for 1,000,000 environment steps
+per run. The realised lengths differ (Table 3 of the paper), and three of the five
+runs in each configuration share a logging structure (`logs/README.md`).
 
 | Config | Policy | Observation fed to the policy |
 |---|---|---|
@@ -78,7 +78,8 @@ Steering is `[-1, 1]`; throttle is rescaled to `[0, 1]` before it reaches the
 simulator.
 
 Evaluation: every 10,000 steps, 5 deterministic episodes from the same fixed
-start pose. Evaluation transitions must not enter the replay buffer.
+start pose, without entering the replay buffer. These evaluation outputs were not
+retained and are not used by any result in the paper.
 
 Cost ≈ 180 s per 10k steps for Configs 2–4, ≈ 430 s for Config 1 — so a single
 Config 1 run is roughly 12 hours and a full sweep across all four
@@ -90,7 +91,19 @@ figures rather than the RL time alone.
 
 ## 3. Figures and tables
 
-Regenerate the curves from the shipped logs, with no retraining:
+Tables 4 and 5 and Figure 9 are computed from the shipped training logs, with no
+retraining:
+
+```bash
+unzip logs/logs.zip -d logs/
+python scripts/traceable_metrics.py --root logs/logs --out stats
+python scripts/make_figure9.py --laps stats/laps_traceable.csv
+```
+
+Metric definitions, step windows and the within-run then across-run aggregation
+are documented in `logs/README.md`.
+
+Regenerate the learning curves of Figure 8:
 
 ```bash
 python scripts/make_figures.py --root logs --out ./figures
@@ -109,19 +122,10 @@ Runs are exponentially smoothed and resampled onto a common step grid before
 aggregation, so the band reflects between-run spread rather than differences in
 logging cadence.
 
-Metric definitions, which matter because two of them are easy to confuse:
-
-| Metric | Definition |
-|---|---|
-| Mean Reward | mean ± SD of the final evaluation return across the 5 runs |
-| Peak Reward | single highest evaluation return at any evaluation point in any run — an extremum, so **higher than the peak of the aggregated curve** in Figure 8 |
-| Best Lap | fastest single lap across all evaluation episodes and all runs; N/A if no lap was completed |
-| Median Lap | median over all laps completed during post-convergence evaluation episodes, pooled across runs |
-| Conv. Step | first step at which a configuration's evaluation return reaches 50% of *its own* peak — a curve-shape measure, not an absolute level |
-
-Reference values from Table 3: Config 3 peaks at 4,084 with a 26.2 s best lap
-and a 28.5 s median, reaching 50%-of-peak at ≈ 136k steps. Config 4 peaks at
-3,102, reaching 50%-of-peak at ≈ 153k. Config 1 never completed a lap.
+Reference values from Table 4 (mean ± SD across runs): rollout return over
+steps 0.8–0.9M of 3,362 ± 927 for Config 3, 2,474 ± 205 for Config 4 and
+877 ± 279 for Config 2; fastest lap 26.2 s (Config 3). Config 1 records no
+sustained lap completion.
 
 ---
 

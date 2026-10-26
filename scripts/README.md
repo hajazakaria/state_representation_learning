@@ -2,7 +2,10 @@
 
 | File | Purpose |
 |---|---|
-| `make_figures.py` | regenerates every figure in the paper directly from the TensorBoard event files in `logs/`, plus a CSV of per-run aggregate metrics |
+| `traceable_metrics.py` | computes every entry of Tables 4 and 5 of the paper from the event files; see `logs/README.md` for the definitions |
+| `make_figure9.py` | regenerates Figure 9 from the lap events written by `traceable_metrics.py` |
+| `make_figures.py` | regenerates the learning curves of Figure 8 directly from the event files, plus supplementary diagnostic plots |
+| `run_statistics.py` | per-run asymptotic returns over [800k, 900k); its pairwise tests assume independent runs and are not reported in the paper |
 | `export_tensorboard.py` | converts the event files into one tidy long-format CSV (`config, run, step, metric, value`) |
 | `inspect_checkpoint.py` | prints the contents of a `models/*.pkl` checkpoint -- latent width, layer names, and whether it holds the encoder alone or the full autoencoder |
 
